@@ -43,7 +43,7 @@ end
 class Ui
   DEFAULT_ENEMY_WON_FILE = 'sword_drop.mp3'.freeze
   DEFAULT_YOU_WON_FILE = 'sword_slice.mp3'.freeze
-  DEFAULT_FAIL_FILE = 'fail-trombone-01.mp3'.freeze
+  DEFAULT_DEFEAT_FILE = 'defeat.mp3'.freeze
   DEFAULT_VICTORY_FILE = 'victory.mp3'.freeze
   DEFAULT_ROAR_FILE = 'dragon_fire.mp3'.freeze
   DEFAULT_SWORD_FILE = 'sword1.mp3'.freeze
@@ -53,7 +53,7 @@ class Ui
   attr_reader :you_won_file
   attr_reader :enemy_won_file
   attr_reader :luck_file
-  attr_reader :fail_file
+  attr_reader :defeat_file
   attr_reader :victory_file
   attr_reader :roar_file
   attr_reader :start_file
@@ -67,7 +67,7 @@ class Ui
     @you_won_file = options[ :you_won_file ] || DEFAULT_YOU_WON_FILE
     @quit_file = options[ :quit_file ] || DEFAULT_QUIT_FILE
     @luck_file = options[ :luck_file ] || DEFAULT_LUCK_FILE
-    @fail_file = options[ :fail_file ] || DEFAULT_FAIL_FILE
+    @defeat_file = options[ :defeat_file ] || DEFAULT_DEFEAT_FILE
     @victory_file = options[ :victory_file ] || DEFAULT_VICTORY_FILE
     @roar_file = options[ :roar_file ] || DEFAULT_ROAR_FILE
     @sword_file = options[ :sword_file ] || DEFAULT_SWORD_FILE
@@ -114,7 +114,7 @@ class Ui
 
   private
 
-  ['sword', 'start', 'roar', 'victory', 'fail', 'quit', 'enemy_won', 'you_won', 'luck'].each do |key|
+  ['sword', 'start', 'roar', 'victory', 'defeat', 'quit', 'enemy_won', 'you_won', 'luck'].each do |key|
     method_name = "#{key}_sound"
     define_method(method_name) do
       unless instance_variable_get("@#{method_name}")
@@ -292,7 +292,7 @@ class DragonSlayer
           ui.interstitial "The #{enemy} inflicted #{damage_this_round} damage-point(s) to you for a total of #{@you.total_damage} damage-points", :clear_screen => false, :sound_name => :roar
           if you.dead?
             ui.play :enemy_won
-            ui.interstitial "...and you're dead!", :clear_screen => false, :sound_name => :fail, :initial_sleep => 3
+            ui.interstitial "...and you're dead!", :clear_screen => false, :sound_name => :defeat, :initial_sleep => 3
             @slaying = false
           else
             ui.interstitial "...and you better run, #{you}!", :clear_screen => false
