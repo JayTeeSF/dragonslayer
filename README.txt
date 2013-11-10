@@ -13,3 +13,6 @@ The course:
   (2.1) extract questions to yml
   (3) add sound effects... 
   (3.1) refactor, probably extract sounds to yml
+  (4) associate levels & point(-range)s with questions
+  (5) change display to use a game window
+  (6) package and distribute game

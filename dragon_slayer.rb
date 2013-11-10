@@ -35,7 +35,7 @@ class Character
 end
 
 class NullSound
-  def play
+  def play(arg=nil)
     puts 'roar...'
   end
 end
@@ -48,11 +48,11 @@ class Ui
   DEFAULT_ROAR_FILE = 'dragon_fire.mp3'.freeze
   DEFAULT_SWORD_FILE = 'sword1.mp3'.freeze
   DEFAULT_START_FILE = 'war_horn.mp3'.freeze
-  DEFAULT_LUCK_FILE = 'coin_spin.mp3'.freeze
+  DEFAULT_MISS_FILE = 'sword_whoosh.mp3'.freeze
   DEFAULT_QUIT_FILE = 'chicken_cluck.mp3'.freeze
   attr_reader :you_won_file
   attr_reader :enemy_won_file
-  attr_reader :luck_file
+  attr_reader :miss_file
   attr_reader :defeat_file
   attr_reader :victory_file
   attr_reader :roar_file
@@ -66,7 +66,7 @@ class Ui
     @enemy_won_file = options[ :enemy_won_file ] || DEFAULT_ENEMY_WON_FILE
     @you_won_file = options[ :you_won_file ] || DEFAULT_YOU_WON_FILE
     @quit_file = options[ :quit_file ] || DEFAULT_QUIT_FILE
-    @luck_file = options[ :luck_file ] || DEFAULT_LUCK_FILE
+    @miss_file = options[ :miss_file ] || DEFAULT_MISS_FILE
     @defeat_file = options[ :defeat_file ] || DEFAULT_DEFEAT_FILE
     @victory_file = options[ :victory_file ] || DEFAULT_VICTORY_FILE
     @roar_file = options[ :roar_file ] || DEFAULT_ROAR_FILE
@@ -114,12 +114,14 @@ class Ui
 
   private
 
-  ['sword', 'start', 'roar', 'victory', 'defeat', 'quit', 'enemy_won', 'you_won', 'luck'].each do |key|
+  ['sword', 'start', 'roar', 'victory', 'defeat', 'quit', 'enemy_won', 'you_won', 'miss'].each do |key|
     method_name = "#{key}_sound"
     define_method(method_name) do
       unless instance_variable_get("@#{method_name}")
         music_file =  send("#{key}_file")
-        instance_variable_set("@#{method_name}", Gosu::Sample.new(window, music_file))
+        if File.exists?(music_file)
+          instance_variable_set("@#{method_name}", Gosu::Sample.new(window, music_file))
+        end
       end
       if instance_variable_get("@#{method_name}")
         instance_variable_get("@#{method_name}")
@@ -275,7 +277,7 @@ class DragonSlayer
     while slaying?
       prepare_to_attack
       if 0 == damage_this_round
-        ui.interstitial( "The good news, the #{enemy} missed. The bad news, so did you!", :sound_name => :luck, :clear_screen => false, :final_sleep => 7 )
+        ui.interstitial( "The good news, the #{enemy} missed. The bad news, so did you!", :sound_name => :miss, :clear_screen => false, :final_sleep => 7 )
       else
         if you_hit_enemy?
           @enemy.hit(damage_this_round)
