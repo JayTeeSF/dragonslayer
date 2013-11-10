@@ -1,5 +1,8 @@
 #!/usr/bin/env ruby
 
+require 'yaml'
+#require "rubygame"
+require "gosu"
 class Character
   attr_reader :strength, :hit_power, :total_damage, :name
   STRENGTH = 4
@@ -31,7 +34,44 @@ class Character
   end
 end
 
+class NullSound
+  def play
+    puts 'roar...'
+  end
+end
+
 class Ui
+  DEFAULT_ENEMY_WON_FILE = 'sword_drop.mp3'.freeze
+  DEFAULT_YOU_WON_FILE = 'sword_slice.mp3'.freeze
+  DEFAULT_FAIL_FILE = 'fail-trombone-01.mp3'.freeze
+  DEFAULT_ROAR_FILE = 'dragon_fire.mp3'.freeze
+  DEFAULT_SWORD_FILE = 'sword1.mp3'.freeze
+  DEFAULT_START_FILE = 'war_horn.mp3'.freeze
+  DEFAULT_LUCK_FILE = 'coin_spin.mp3'.freeze
+  DEFAULT_QUIT_FILE = 'chicken_cluck.mp3'.freeze
+  attr_reader :you_won_file
+  attr_reader :enemy_won_file
+  attr_reader :luck_file
+  attr_reader :fail_file
+  attr_reader :roar_file
+  attr_reader :start_file
+  attr_reader :quit_file
+  attr_reader :sword_file
+  attr_reader :null_sound
+  attr_reader :window
+  def initialize( options = {} )
+    @window = Gosu::Window.new(640, 480, false)
+    @enemy_won_file = options[ :enemy_won_file ] || DEFAULT_ENEMY_WON_FILE
+    @you_won_file = options[ :you_won_file ] || DEFAULT_YOU_WON_FILE
+    @quit_file = options[ :quit_file ] || DEFAULT_QUIT_FILE
+    @luck_file = options[ :luck_file ] || DEFAULT_LUCK_FILE
+    @fail_file = options[ :fail_file ] || DEFAULT_FAIL_FILE
+    @roar_file = options[ :roar_file ] || DEFAULT_ROAR_FILE
+    @sword_file = options[ :sword_file ] || DEFAULT_SWORD_FILE
+    @start_file = options[ :start_file ] || DEFAULT_START_FILE
+    @null_sound = NullSound.new
+  end
+
   def inform message
     puts message
   end
@@ -43,6 +83,29 @@ class Ui
     #system "stty echo"
     puts
     answer
+  end
+
+  def play(key=:roar)
+    send("#{key}_sound").play
+  end
+
+  private
+  # TODO define_method...
+
+  ['sword', 'start', 'roar', 'fail', 'quit', 'enemy_won', 'you_won', 'luck'].each do |key|
+    method_name = "#{key}_sound"
+    define_method(method_name) do
+      unless instance_variable_get("@#{method_name}")
+        music_file =  send("#{key}_file")
+        instance_variable_set("@#{method_name}", Gosu::Sample.new(window, music_file))
+      end
+      if instance_variable_get("@#{method_name}")
+        instance_variable_get("@#{method_name}")
+      else
+        warn "null"
+        null_sound
+      end
+    end
   end
 end
 
@@ -99,12 +162,28 @@ class Question
   end
 end
 
+QFILE="./question_file.yml"
+class QuestionLoader
+  attr_reader :question_file
+  def initialize(question_file)
+    @question_file = question_file
+  end
+  def load
+    if config = YAML.load(File.open(question_file))
+      config[:questions]
+    else
+      []
+    end
+  end
+end
 # TODO make the answers be lambda's so that we can process the input
+LOADED_QUESTIONS = QuestionLoader.new(QFILE).load
 DEFAULT_QUESTIONS = [
   [ "%s * 9 = 45 ", ["5", "(4 + 1)", lambda{|expr| full_expr = "#{expr} * 9"; 45 == eval(full_expr)}] ],
   [ "2 + 2 = %s ", ["4", lambda{|expr| (expr =~ /\-*[0-9\.\)\(]+/) && (2 + 2 == eval(expr))}] ], # restrict answer
   [ "What are you suppose to practice now %s ", [/piano/i], {:full_response => "You are suppose to practice the %s"} ],
-]
+] + LOADED_QUESTIONS
+
 
 You = Character.new(:name => ['buddy', 'kid'].sample)
 Dragon = Character.new(:name => 'Dragon', :strength => 5, :hit_power => 2..7)
@@ -150,6 +229,8 @@ class DragonSlayer
 
   def quit
     ui.inform QUIT_MSG
+    ui.play :quit
+    sleep 5
     exit
   end
 
@@ -162,24 +243,32 @@ class DragonSlayer
   end
 
   def attack
+    ui.play :start
     while slaying?
       prepare_to_attack
       if 0 == damage_this_round
+        ui.play :luck
         ui.inform( "The good news, the #{enemy} missed. The bad news, so did you!" )
       else
         if you_hit_enemy?
+          ui.play :sword
           @enemy.hit(damage_this_round)
           ui.inform "You inflicted #{damage_this_round} damage-point(s) to the #{enemy} for a total of #{@enemy.total_damage} damage-points"
           if enemy.dead?
+            ui.play :you_won
             ui.inform "...and he's dead!"
             @slaying = false
           else
             ui.inform "...and he's mad now, #{you}!"
           end
         elsif enemy_hit_you?
+          ui.play :roar
           @you.hit(damage_this_round)
           ui.inform "The #{enemy} inflicted #{damage_this_round} damage-point(s) to you for a total of #{@you.total_damage} damage-points"
           if you.dead?
+            ui.play :enemy_won
+            sleep 3
+            ui.play :fail
             ui.inform "...and you're dead!"
             @slaying = false
           else
@@ -269,3 +358,4 @@ end
 
 dragon_slayer = DragonSlayer.new
 dragon_slayer.attack
+sleep 5
