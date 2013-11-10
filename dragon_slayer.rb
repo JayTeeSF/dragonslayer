@@ -85,12 +85,28 @@ class Ui
     answer
   end
 
+  def interstitial( text, snd, options = {} )
+    initial_sleep = extract_or_default( :initial_sleep, 1, options )
+    clear_screen(initial_sleep)
+    display text
+    play snd
+    final_sleep = extract_or_default( :final_sleep, 1.2, options )
+    sleep(final_sleep)
+  end
+
   def play(key=:roar)
     send("#{key}_sound").play
   end
 
+  def clear_screen( after = 0 )
+    sleep( after )
+    display "\e[H\e[2J"
+  end
+
+
   private
-  # TODO define_method...
+
+  alias_method :display, :inform
 
   ['sword', 'start', 'roar', 'fail', 'quit', 'enemy_won', 'you_won', 'luck'].each do |key|
     method_name = "#{key}_sound"
@@ -106,6 +122,14 @@ class Ui
         null_sound
       end
     end
+  end
+
+  def extract_or_default(key, default, options={})
+    got = options[key]
+    unless got
+      got = default
+    end
+    return got
   end
 end
 
@@ -213,6 +237,7 @@ class DragonSlayer
     @enemy = _enemy
     @ui = _ui
     @questions = _questions
+    ui.clear_screen
     instructions
   end
 
