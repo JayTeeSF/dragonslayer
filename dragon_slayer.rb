@@ -44,6 +44,7 @@ class Ui
   DEFAULT_ENEMY_WON_FILE = 'sword_drop.mp3'.freeze
   DEFAULT_YOU_WON_FILE = 'sword_slice.mp3'.freeze
   DEFAULT_FAIL_FILE = 'fail-trombone-01.mp3'.freeze
+  DEFAULT_VICTORY_FILE = 'victory.mp3'.freeze
   DEFAULT_ROAR_FILE = 'dragon_fire.mp3'.freeze
   DEFAULT_SWORD_FILE = 'sword1.mp3'.freeze
   DEFAULT_START_FILE = 'war_horn.mp3'.freeze
@@ -53,6 +54,7 @@ class Ui
   attr_reader :enemy_won_file
   attr_reader :luck_file
   attr_reader :fail_file
+  attr_reader :victory_file
   attr_reader :roar_file
   attr_reader :start_file
   attr_reader :quit_file
@@ -66,13 +68,14 @@ class Ui
     @quit_file = options[ :quit_file ] || DEFAULT_QUIT_FILE
     @luck_file = options[ :luck_file ] || DEFAULT_LUCK_FILE
     @fail_file = options[ :fail_file ] || DEFAULT_FAIL_FILE
+    @victory_file = options[ :victory_file ] || DEFAULT_VICTORY_FILE
     @roar_file = options[ :roar_file ] || DEFAULT_ROAR_FILE
     @sword_file = options[ :sword_file ] || DEFAULT_SWORD_FILE
     @start_file = options[ :start_file ] || DEFAULT_START_FILE
     @null_sound = NullSound.new
   end
 
-  def inform message
+  def display message
     puts message
   end
 
@@ -85,13 +88,18 @@ class Ui
     answer
   end
 
-  def interstitial( text, snd, options = {} )
+  def interstitial( message_or_question, options = {} )
+    sound_name = extract_or_default( :sound_name, nil, options )
     initial_sleep = extract_or_default( :initial_sleep, 1, options )
-    clear_screen(initial_sleep)
-    display text
-    play snd
     final_sleep = extract_or_default( :final_sleep, 1.2, options )
-    sleep(final_sleep)
+    presentation_method = extract_or_default( :presentation_method, :display, options )
+    is_clear_screen = extract_or_default( :clear_screen, true, options )
+
+    play sound_name if sound_name
+    clear_screen(initial_sleep) if is_clear_screen
+    send(presentation_method, message_or_question).tap do |response|
+      sleep(final_sleep)
+    end
   end
 
   def play(key=:roar)
@@ -106,9 +114,7 @@ class Ui
 
   private
 
-  alias_method :display, :inform
-
-  ['sword', 'start', 'roar', 'fail', 'quit', 'enemy_won', 'you_won', 'luck'].each do |key|
+  ['sword', 'start', 'roar', 'victory', 'fail', 'quit', 'enemy_won', 'you_won', 'luck'].each do |key|
     method_name = "#{key}_sound"
     define_method(method_name) do
       unless instance_variable_get("@#{method_name}")
@@ -125,8 +131,9 @@ class Ui
   end
 
   def extract_or_default(key, default, options={})
-    got = options[key]
-    unless got
+    if options.has_key?(key)
+      got = options[key]
+    else
       got = default
     end
     return got
@@ -218,7 +225,7 @@ class DragonSlayer
   HELP_MSG = "\nFor this message, type 'help' (or '?'), otherwise:\n\tType the best answer you can think of. Then press 'enter'.\n\tType 'quit' (or 'exit') to chicken-out.\n\n"
   QUIT_MSG = "\n\n\tFine, run away...\n"
   CHEAT_MSG = "\n\tHave you considered that:\n\t\t%s"
-  TRY_MSG = "This is your %s try..."
+  TRY_MSG = "Come on, this is try #%s..."
   SPECIAL_ANSWERS = {
     /^\s*$|attack/ => 'try_again',
     /\?|help/i => 'help',
@@ -237,13 +244,11 @@ class DragonSlayer
     @enemy = _enemy
     @ui = _ui
     @questions = _questions
-    ui.clear_screen
-    instructions
   end
 
   def cheat
     _question_with_answer = question.full_response_with( question.displayable_answers.sample )
-    ui.inform( CHEAT_MSG % _question_with_answer )
+    ui.interstitial( CHEAT_MSG % _question_with_answer, :final_sleep => 4.7 )
     try_again
   end
 
@@ -253,51 +258,44 @@ class DragonSlayer
   end
 
   def quit
-    ui.inform QUIT_MSG
-    ui.play :quit
-    sleep 5
+    ui.interstitial QUIT_MSG, :sound_name => :quit, :final_sleep => 2.0
     exit
   end
 
   def try_again
     @tries += 1
-    ui.inform TRY_MSG % @tries
+    ui.interstitial TRY_MSG % @tries, :clear_screen => false
 
     @response = nil
     response
   end
 
   def attack
-    ui.play :start
+    instructions :sound_name => :start, :final_sleep => 9
     while slaying?
       prepare_to_attack
       if 0 == damage_this_round
-        ui.play :luck
-        ui.inform( "The good news, the #{enemy} missed. The bad news, so did you!" )
+        ui.interstitial( "The good news, the #{enemy} missed. The bad news, so did you!", :sound_name => :luck, :clear_screen => false, :final_sleep => 7 )
       else
         if you_hit_enemy?
-          ui.play :sword
           @enemy.hit(damage_this_round)
-          ui.inform "You inflicted #{damage_this_round} damage-point(s) to the #{enemy} for a total of #{@enemy.total_damage} damage-points"
+          ui.interstitial "You inflicted #{damage_this_round} damage-point(s) to the #{enemy} for a total of #{@enemy.total_damage} damage-points", :clear_screen => false, :sound_name => :sword
           if enemy.dead?
             ui.play :you_won
-            ui.inform "...and he's dead!"
+            ui.interstitial "...and he's dead!", :clear_screen => false, :sound_name => :victory, :initial_sleep => 3
             @slaying = false
           else
-            ui.inform "...and he's mad now, #{you}!"
+            ui.interstitial "...and he's mad now, #{you}!", :clear_screen => false
           end
         elsif enemy_hit_you?
-          ui.play :roar
           @you.hit(damage_this_round)
-          ui.inform "The #{enemy} inflicted #{damage_this_round} damage-point(s) to you for a total of #{@you.total_damage} damage-points"
+          ui.interstitial "The #{enemy} inflicted #{damage_this_round} damage-point(s) to you for a total of #{@you.total_damage} damage-points", :clear_screen => false, :sound_name => :roar
           if you.dead?
             ui.play :enemy_won
-            sleep 3
-            ui.play :fail
-            ui.inform "...and you're dead!"
+            ui.interstitial "...and you're dead!", :clear_screen => false, :sound_name => :fail, :initial_sleep => 3
             @slaying = false
           else
-            ui.inform "...and you better run, #{you}!"
+            ui.interstitial "...and you better run, #{you}!", :clear_screen => false
           end
         end
       end
@@ -324,24 +322,25 @@ class DragonSlayer
 
   def response
     unless @response
-      _response = ui.ask( question )
+      _response = ui.interstitial( question, :presentation_method => :ask )
       tokenized_response = Question.tokenize( _response, SPECIAL_ANSWERS )
       if respond_to?(tokenized_response)
         return @response = send(tokenized_response)
       end
       @response = tokenized_response
-      ui.inform question.full_response_with(@response)
+      # ui.display question.full_response_with(@response)
+      ui.interstitial question.full_response_with(@response)
     end
     @response
   end
 
-  def instructions
-    ui.inform HELP_MSG
+  def instructions(options={})
+    ui.interstitial HELP_MSG, options
   end
 
   def correct_answer?
     question.correct?( response ).tap do |bool|
-      ui.inform( bool ? "Correct" : "Wrong" )
+      ui.display( bool ? "Correct" : "Wrong" )
     end
   end
 
