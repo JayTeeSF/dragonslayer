@@ -1,0 +1,8 @@
+#!/usr/bin/env ruby
+
+require_relative '../lib/dragon_slayer'
+
+dragon_slayer = DragonSlayer.new
+#dragon_slayer.update
+dragon_slayer.attack
+sleep 5
