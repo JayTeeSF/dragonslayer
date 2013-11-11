@@ -42,27 +42,42 @@ class Ui
     @null_sound = NullSound.new
   end
 
+  def run
+    @window.show unless @window.shown?
+  end
+
   def exit
     window.close
-    exit
+    Kernel.exit
   end
 
-  def display message
-    #@window.show unless @window.shown?
-    #@window.message = message
+  def display message, options={}
+    final_sleep = extract_or_default( :final_sleep, nil, options )
+    @window.message = message
     puts message
+    if final_sleep
+      puts "going to sleep state..."
+      game_sleep(final_sleep)
+    end
   end
 
-  def ask question
-    #@window.message = "#{question}\n\t=> "
-    print "#{question}\n\t=> "
+  def ask question, options={}
+    final_sleep = extract_or_default( :final_sleep, nil, options )
+    set_raw_response = extract_or_default( :set_raw_response, false, options )
+    @window.message = "#{question}\n\t=> " #print "#{question}\n\t=> "
     #system "stty -echo"
-    answer = gets.chomp #<-- need to replace this with some screen buttons
+    # answer = gets.chomp #<-- need to replace this with some screen buttons
     # put game in :await-answer state
     #system "stty echo"
-    #@window.message += "\n"
-    puts
-    answer
+    #@window.message += "\n" #puts
+    #    answer
+
+    #display the textbox for game.response
+    #@window.update_ask
+    if final_sleep
+      puts "going to sleep state..."
+      game_sleep(final_sleep)
+    end
   end
 
   def interstitial( message_or_question, options = {} )
@@ -71,29 +86,32 @@ class Ui
     final_sleep = extract_or_default( :final_sleep, 1.2, options )
     presentation_method = extract_or_default( :presentation_method, :display, options )
     is_clear_screen = extract_or_default( :clear_screen, true, options )
+    set_raw_response = extract_or_default( :set_raw_response, false, options )
 
     play sound_name if sound_name
-    clear_screen(initial_sleep) if is_clear_screen
+    # clear_screen(initial_sleep) if is_clear_screen
     # game.queue_presentation(presentation_method, message_or_question)
     #game.response = send(presentation_method, message_or_question)
-    send(presentation_method, message_or_question).tap do |response|
-      game_sleep(final_sleep)
-    end
+    puts "presenting with #{presentation_method.inspect}..."
+    send(presentation_method, message_or_question, :final_sleep => final_sleep, :set_raw_response => set_raw_response)
   end
 
   def game_sleep(sleep_amount)
-    sleep sleep_amount
-    # game.sleep_till(Gosu::milliseconds + (sleep_amount * 1000))
+    game.sleep_till(Gosu::milliseconds + (sleep_amount * 1000))
   end
 
   def play(key=:roar)
     send("#{key}_sound").play
   end
 
+  def clear_display
+    display ""
+    # display "\e[H\e[2J"
+  end
+
   def clear_screen( after = 0 )
+    game.queue(:clear_display)
     game_sleep( after )
-    # display ""
-    display "\e[H\e[2J"
   end
 
 
@@ -102,9 +120,9 @@ class Ui
   ['sword', 'start', 'roar', 'victory', 'defeat', 'quit', 'enemy_won', 'you_won', 'miss'].each do |key|
     method_name = "#{key}_sound"
     define_method(method_name) do
-      music_file_name = send("#{key}_file")
-      music_file_path =  "media/#{music_file_name}"
       unless instance_variable_get("@#{method_name}")
+        music_file_name = send("#{key}_file")
+        music_file_path =  "media/#{music_file_name}"
         if File.exists?(music_file_path)
           instance_variable_set("@#{method_name}", Gosu::Sample.new(window, music_file_path))
         end
@@ -112,7 +130,7 @@ class Ui
       if instance_variable_get("@#{method_name}")
         instance_variable_get("@#{method_name}")
       else
-        warn "null for #{music_file_path.inspect}"
+        warn "null"
         null_sound
       end
     end

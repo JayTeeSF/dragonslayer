@@ -3,6 +3,5 @@
 require_relative '../lib/dragon_slayer'
 
 dragon_slayer = DragonSlayer.new
-#dragon_slayer.update
-dragon_slayer.attack
+dragon_slayer.run
 sleep 5

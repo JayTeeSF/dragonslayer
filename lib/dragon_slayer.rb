@@ -20,7 +20,6 @@ Dragon = Character.new(:name => 'Dragon', :strength => 5, :hit_power => 2..7)
 SuperDragon = Character.new(:name => 'SuperDragon', :strength => 7, :hit_power => 3..10)
 Questions = DEFAULT_QUESTIONS.collect {|details| Question.new *details }
 
-
 class DragonSlayer
   HELP_MSG = "\nFor this message, type 'help' (or '?'), otherwise:\n\tType the best answer you can think of. Then press 'enter'.\n\tType 'quit' (or 'exit') to chicken-out.\n\n"
   QUIT_MSG = "\n\n\tFine, run away...\n"
@@ -33,80 +32,198 @@ class DragonSlayer
     /quit|exit/i => 'quit',
   }
 
-  attr_reader :you, :enemy, :ui, :questions
+  attr_reader :you, :enemy, :ui, :questions, :attacking, :aggressor
   private :you
   private :enemy
   private :ui
   private :questions
+  attr_accessor :state, :sleep_end, :state_queue, :raw_response
+  alias_method :attacking?, :attacking
   def initialize(_you=You, _enemy=[Dragon, SuperDragon].sample, _ui=Ui.new(self), _questions=Questions)
+    @instructing = false
+    @sleeping = false
     @slaying = true # global boolean
     @you = _you
     @enemy = _enemy
     @ui = _ui
     @questions = _questions
+    @sleep_end = Gosu::milliseconds
+    @state_queue = [:instruction_state]
+    @attacking = false
+    @response = nil
+    prepare_to_attack
+    next_state
+  end
+
+  def run
+    @ui.run
+  end
+
+  def peek_state
+    @state_queue.last
+  end
+
+  def next_state
+    puts "popping state: #{peek_state.inspect}"
+    @state = @state_queue.pop
   end
 
   def name
     self.class.name
   end
 
+  def sleep_till(sleep_end)
+    @sleep_end = sleep_end
+    @state = :sleep_state
+  end
+
   def cheat
     _question_with_answer = question.full_response_with( question.displayable_answers.sample )
     ui.interstitial( CHEAT_MSG % _question_with_answer, :final_sleep => 4.7 )
-    try_again
+    queue(:try_again)
+    # try_again
   end
 
   def help
-    instructions
-    try_again
+    queue(:instructions)
+    #instructions
+    queue(:try_again)
+    #try_again
   end
 
   def quit
+    queue(:_exit)
     ui.interstitial QUIT_MSG, :sound_name => :quit, :final_sleep => 2.0
-    exit
+  end
+
+  def _exit
+    ui.exit
   end
 
   def try_again
     @tries += 1
-    ui.interstitial TRY_MSG % @tries, :clear_screen => false
-
     @response = nil
-    response
+    @raw_response = nil
+    queue(:get_raw_response)
+    ui.interstitial TRY_MSG % @tries, :clear_screen => false
+  end
+
+  def instructing?
+    !!@instructing
+  end
+
+  def instruction_state
+    return if instructing?
+    @instructing = true
+    instructions :sound_name => :start, :final_sleep => 9
+    puts "done."
+    @instructing = false
+  end
+
+  def sleep_state
+    time_left = @sleep_end - Gosu::milliseconds
+    # puts "time_left: #{time_left.inspect}"
+    @sleeping = true
+    return if time_left > 0
+    @sleeping = false
+    #puts "peek_state: #{peek_state.inspect}"
+    next_state
+  end
+
+  def clear_display
+    ui.clear_display
+  end
+
+  def queue(method_name)
+    state_queue.push(method_name)
+  end
+
+  def update
+    if state
+      # puts "sending state: #{state}"
+      return send(state)
+    else
+      #puts "updating..."
+      unless slaying?
+        puts "exiting"
+        ui.exit
+      end
+      unless attacking?
+        puts "preparing to attack..."
+        queue(:attack)
+        @attacking = true
+        prepare_to_attack
+        queue(:assign_aggressor)
+        queue(:correct_answer?)
+        queue(:get_raw_response)
+        next_state
+      end
+    end
   end
 
   def attack
-    instructions :sound_name => :start, :final_sleep => 9
-    while slaying?
-      prepare_to_attack
-      if 0 == damage_this_round
-        ui.interstitial( "The good news, the #{enemy} missed. The bad news, so did you!", :sound_name => :miss, :clear_screen => false, :final_sleep => 7 )
-      else
-        if you_hit_enemy?
-          @enemy.hit(damage_this_round)
-          ui.interstitial "You inflicted #{damage_this_round} damage-point(s) to the #{enemy} for a total of #{@enemy.total_damage} damage-points", :clear_screen => false, :sound_name => :sword
-          if enemy.dead?
-            ui.play :you_won
-            ui.interstitial "...and he's dead!", :clear_screen => false, :sound_name => :victory, :initial_sleep => 3
-            @slaying = false
-          else
-            ui.interstitial "...and he's mad now, #{you}!", :clear_screen => false
-          end
-        elsif enemy_hit_you?
-          @you.hit(damage_this_round)
-          ui.interstitial "The #{enemy} inflicted #{damage_this_round} damage-point(s) to you for a total of #{@you.total_damage} damage-points", :clear_screen => false, :sound_name => :roar
-          if you.dead?
-            ui.play :enemy_won
-            ui.interstitial "...and you're dead!", :clear_screen => false, :sound_name => :defeat, :initial_sleep => 3
-            @slaying = false
-          else
-            ui.interstitial "...and you better run, #{you}!", :clear_screen => false
-          end
-        end
+    if 0 == damage_this_round
+      queue(:missed)
+      @attacking = false
+      next_state
+    else
+      if you_hit_enemy?
+        @enemy.hit( damage_this_round )
+        queue(:determine_if_enemy_is_dead)
+        @attacking = false
+        ui.interstitial "You inflicted #{damage_this_round} damage-point(s) to the #{enemy}\nfor a total of #{@enemy.total_damage}", :clear_screen => false, :sound_name => :sword
+      elsif enemy_hit_you?
+        @you.hit( damage_this_round )
+        queue(:determine_if_you_are_dead)
+        @attacking = false
+        ui.interstitial "The #{enemy} inflicted #{damage_this_round} damage-point(s) to you\nfor a total of #{@you.total_damage}", :clear_screen => false, :sound_name => :roar
       end
     end
   end
 
   private
+
+  def determine_if_you_are_dead
+    if you.dead?
+      queue(:you_dead)
+    else
+      queue(:better_run)
+    end
+    next_state
+  end
+
+  def determine_if_enemy_is_dead
+    if enemy.dead?
+      queue(:enemy_dead)
+    else
+      queue(:better_run)
+    end
+    next_state
+  end
+
+  def you_dead
+    ui.play :enemy_won
+    @slaying = false
+    ui.interstitial "...and you're dead!", :clear_screen => false, :sound_name => :defeat, :initial_sleep => 3
+  end
+
+  def enemy_dead
+    ui.play :you_won
+    @slaying = false
+    ui.interstitial "...and he's dead!", :clear_screen => false, :sound_name => :victory, :initial_sleep => 3
+  end
+
+  def better_run
+    if you_hit_enemy?
+      ui.interstitial "...and you better run, #{you}!", :clear_screen => false
+    else
+      ui.interstitial "...and he's mad now, #{you}!", :clear_screen => false
+    end
+  end
+
+  def missed
+    ui.interstitial( "The good news, the #{enemy} missed. The bad news, so did you!", :sound_name => :miss, :clear_screen => false, :final_sleep => 7 )
+  end
 
   def slaying?
     @slaying
@@ -124,17 +241,31 @@ class DragonSlayer
     @question
   end
 
-  def response
-    unless @response
-      _response = ui.interstitial( question, :presentation_method => :ask )
-      tokenized_response = Question.tokenize( _response, SPECIAL_ANSWERS )
-      if respond_to?(tokenized_response)
-        return @response = send(tokenized_response)
-      end
-      @response = tokenized_response
-      # ui.display question.full_response_with(@response)
-      ui.interstitial question.full_response_with(@response)
+  def process_raw_response
+    unless @raw_response
+      puts "no raw response, yet"
+      return
     end
+    @tokenized_response = Question.tokenize( @raw_response, SPECIAL_ANSWERS )
+    if respond_to?(@tokenized_response)
+      queue(:process_tokenized_response)
+      # return @response = send(tokenized_response)
+      return send(@tokenized_response)
+    end
+    process_tokenized_response
+  end
+
+  def process_tokenized_response
+    @response = @tokenized_response
+    ui.interstitial question.full_response_with(@response)
+  end
+
+  def get_raw_response
+    queue(:process_raw_response)
+    ui.interstitial( question, :presentation_method => :ask, :set_raw_response => true )
+  end
+
+  def response
     @response
   end
 
@@ -143,25 +274,20 @@ class DragonSlayer
   end
 
   def correct_answer?
-    question.correct?( response ).tap do |bool|
-      ui.display( bool ? "Correct" : "Wrong" )
+    if nil == @bool #distinguish nil from false
+      question.correct?( response ).tap do |bool|
+        @bool = bool
+        ui.display( bool ? "Correct" : "Wrong" )
+        next_state
+      end
     end
+    @bool
   end
 
-  # return value based on answer to question
-  def aggressor
-    unless @aggressor
-      @aggressor = correct_answer? ? you : enemy
-    end
-    @aggressor
+  def assign_aggressor
+    @aggressor = correct_answer? ? you : enemy
+    next_state
   end
-
-  #def other
-  #  unless @other
-  #  @other = ([ you, enemy ] - [aggressor]).first
-  #  end
-  #  @other
-  #end
 
   def you_hit_enemy?
     you == aggressor
@@ -175,8 +301,10 @@ class DragonSlayer
   end
 
   def prepare_to_attack
+    @bool = nil
     @tries = 1
     @question = nil
+    @raw_response = nil
     @response = nil
     @aggressor = nil
     #@other = nil
