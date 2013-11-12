@@ -5,26 +5,38 @@ class TextField < Gosu::TextInput
   SELECTION_COLOR = 0xcc0000ff
   CARET_COLOR     = 0xffffffff
   PADDING = 5
-  
-  attr_reader :x, :y
-  
+
+  attr_reader :x, :y, :window, :drawn
+  alias_method :drawn?, :drawn
+
   def initialize(window, font, x, y)
     # TextInput's constructor doesn't expect any arguments.
     super()
-    
     @window, @font, @x, @y = window, font, x, y
-    
+    @drawn = false
+
     # Start with a self-explanatory text in each field.
     self.text = "Click to change text"
   end
-  
+
   # Example filter method. You can truncate the text to employ a length limit (watch out
   # with Ruby 1.8 and UTF-8!), limit the text to certain characters etc.
   #def filter text
   #  text.upcase
+
+  def clicked?
+    return false unless drawn?
+    under_point?(window.mouse_x, window.mouse_y)
+  end
+
   #end
-  
+
+  def erase
+    @drawn = false
+  end
+
   def draw
+    @drawn = true
     # Depending on whether this is the currently selected input or not, change the
     # background's color.
     if @window.text_input == self then
@@ -36,11 +48,11 @@ class TextField < Gosu::TextInput
                       x + width + PADDING, y - PADDING,          background_color,
                       x - PADDING,         y + height + PADDING, background_color,
                       x + width + PADDING, y + height + PADDING, background_color, 0)
-    
+
     # Calculate the position of the caret and the selection start.
     pos_x = x + @font.text_width(self.text[0...self.caret_pos])
     sel_x = x + @font.text_width(self.text[0...self.selection_start])
-    
+
     # Draw the selection background, if any; if not, sel_x and pos_x will be
     # the same value, making this quad empty.
     @window.draw_quad(sel_x, y,          SELECTION_COLOR,
@@ -63,18 +75,11 @@ class TextField < Gosu::TextInput
   def width
     @font.text_width(self.text)
   end
-  
+
   def height
     @font.height
   end
 
-  # Hit-test for selecting a text field with the mouse.
-  def under_point?(mouse_x, mouse_y)
-    # puts "width, height: #{width.inspect}, #{height.inspect}; x,y: #{x.inspect}, #{y.inspect}; mouse_x, mouse_y: #{mouse_x.inspect}, #{mouse_y.inspect}"
-    mouse_x > x - PADDING and mouse_x < x + width + PADDING and
-      mouse_y > y - PADDING and mouse_y < y + height + PADDING
-  end
-  
   # Tries to move the caret to the position specifies by mouse_x
   def move_caret(mouse_x)
     # Test character by character
@@ -86,5 +91,13 @@ class TextField < Gosu::TextInput
     end
     # Default case: user must have clicked the right edge
     self.caret_pos = self.selection_start = self.text.length
+  end
+
+  private
+  # Hit-test for selecting a text field with the mouse.
+  def under_point?(mouse_x, mouse_y)
+    # puts "width, height: #{width.inspect}, #{height.inspect}; x,y: #{x.inspect}, #{y.inspect}; mouse_x, mouse_y: #{mouse_x.inspect}, #{mouse_y.inspect}"
+    mouse_x > x - PADDING and mouse_x < x + width + PADDING and
+      mouse_y > y - PADDING and mouse_y < y + height + PADDING
   end
 end
