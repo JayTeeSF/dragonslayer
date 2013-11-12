@@ -1,6 +1,22 @@
 require_relative 'game_window'
 
 class Ui
+  class NullGame
+    def sleep_till(*args)
+    end
+    def queue(*args)
+    end
+  end
+
+  class NullWindow
+    def show
+    end
+    def close
+    end
+    def message=(*args)
+    end
+  end
+
   DEFAULT_ENEMY_WON_FILE = 'sword_drop.mp3'.freeze
   DEFAULT_YOU_WON_FILE = 'sword_slice.mp3'.freeze
   DEFAULT_DEFEAT_FILE = 'defeat.mp3'.freeze
