@@ -70,6 +70,7 @@ class TextField < Gosu::TextInput
 
   # Hit-test for selecting a text field with the mouse.
   def under_point?(mouse_x, mouse_y)
+    # puts "width, height: #{width.inspect}, #{height.inspect}; x,y: #{x.inspect}, #{y.inspect}; mouse_x, mouse_y: #{mouse_x.inspect}, #{mouse_y.inspect}"
     mouse_x > x - PADDING and mouse_x < x + width + PADDING and
       mouse_y > y - PADDING and mouse_y < y + height + PADDING
   end

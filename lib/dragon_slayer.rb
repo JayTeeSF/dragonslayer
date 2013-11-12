@@ -115,9 +115,13 @@ class DragonSlayer
   def instruction_state
     return if instructing?
     @instructing = true
+    queue(:stop_instructing)
     instructions :sound_name => :start, :final_sleep => 9
-    puts "done."
+  end
+
+  def stop_instructing
     @instructing = false
+    next_state
   end
 
   def sleep_state
