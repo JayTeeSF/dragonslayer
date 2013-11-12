@@ -1,6 +1,8 @@
 require "gosu"
 require_relative 'null_sound'
-require_relative 'character'
+require_relative 'you'
+require_relative 'dragon'
+require_relative 'super_dragon'
 require_relative 'ui'
 require_relative 'question'
 require_relative 'question_loader'
@@ -15,9 +17,6 @@ DEFAULT_QUESTIONS = [
 ] + LOADED_QUESTIONS
 
 
-You = Character.new(:name => ['buddy', 'kid'].sample)
-Dragon = Character.new(:name => 'Dragon', :strength => 5, :hit_power => 2..7)
-SuperDragon = Character.new(:name => 'SuperDragon', :strength => 7, :hit_power => 3..10)
 Questions = DEFAULT_QUESTIONS.collect {|details| Question.new *details }
 
 class DragonSlayer
@@ -33,8 +32,8 @@ class DragonSlayer
   }
 
   attr_reader :you, :enemy, :ui, :questions, :attacking, :aggressor
-  private :you
-  private :enemy
+  #private :you
+  #private :enemy
   private :ui
   private :questions
   attr_accessor :state, :sleep_end, :state_queue, :raw_response
