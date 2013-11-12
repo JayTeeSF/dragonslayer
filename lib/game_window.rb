@@ -34,11 +34,11 @@ class GameWindow < Gosu::Window
     game.update
   end
 
-  MOUSE_CLICK = 256
-  ENTER_KEY = 36
+  ENTER_KEY = 36 # vs. GosuKbEnter = 76 !?
   def button_down(id)
     # puts "key id: #{id.inspect}"
-    if MOUSE_CLICK == id
+    # puts "gosu enter (#{Gosu::KbEnter}) == #{ENTER_KEY}"
+    if Gosu::MsLeft == id
       # Mouse click: Select text field based on mouse position.
       if @answer_field.under_point?(mouse_x, mouse_y)
         @answer_field.text = "" # a bit abrupt
@@ -49,6 +49,11 @@ class GameWindow < Gosu::Window
     elsif ENTER_KEY == id #Gosu::KbEnter == id
       game.raw_response = @answer_field.text
     end
+  end
+
+  def close
+    super
+    Kernel.exit
   end
 
   def draw

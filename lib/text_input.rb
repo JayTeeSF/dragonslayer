@@ -20,9 +20,9 @@ class TextField < Gosu::TextInput
   
   # Example filter method. You can truncate the text to employ a length limit (watch out
   # with Ruby 1.8 and UTF-8!), limit the text to certain characters etc.
-  def filter text
-    text.upcase
-  end
+  #def filter text
+  #  text.upcase
+  #end
   
   def draw
     # Depending on whether this is the currently selected input or not, change the

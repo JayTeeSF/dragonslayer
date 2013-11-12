@@ -48,7 +48,6 @@ class Ui
 
   def exit
     window.close
-    Kernel.exit
   end
 
   def display message, options={}
