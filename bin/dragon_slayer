@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
-require_relative '../lib/dragon_slayer'
+require_relative '../lib/ui'
 
-dragon_slayer = DragonSlayer.new
+dragon_slayer = Ui.new
 dragon_slayer.run
 sleep 5

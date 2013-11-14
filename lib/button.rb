@@ -11,13 +11,13 @@ class Button < Gosu::Image
       super(window, file, fullscreen)
     end
 
+    alias_method :drawn?, :drawn
     def clicked?
       return false unless drawn?
       under_point?(window.mouse_x, window.mouse_y)
     end
 
-    alias_method :drawn?, :drawn
-    def clear
+    def erase
       @drawn = false
     end
 

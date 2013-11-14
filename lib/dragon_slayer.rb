@@ -3,9 +3,10 @@ require_relative 'null_sound'
 require_relative 'you'
 require_relative 'dragon'
 require_relative 'super_dragon'
-require_relative 'ui'
+# require_relative 'ui'
 require_relative 'question'
 require_relative 'question_loader'
+require_relative 'logger'
 
 
 # TODO make the answers be lambda's so that we can process the input
@@ -17,7 +18,8 @@ DEFAULT_QUESTIONS = [
 ] + LOADED_QUESTIONS
 
 
-Questions = DEFAULT_QUESTIONS.collect {|details| Question.new *details }
+Questions = DEFAULT_QUESTIONS.collect {|details| Question.new(*details) }
+Log = Logger.new
 
 class DragonSlayer
   HELP_MSG = "\nFor this message, type 'help' (or '?'), otherwise:\n\tType the best answer you can think of. Then press 'enter'.\n\tType 'quit' (or 'exit') to chicken-out.\n\n"
@@ -38,7 +40,14 @@ class DragonSlayer
   private :questions
   attr_accessor :state, :sleep_end, :state_queue, :raw_response
   alias_method :attacking?, :attacking
-  def initialize(_you=You, _enemy=[Dragon, SuperDragon].sample, _ui=Ui.new(self), _questions=Questions)
+  def initialize(options={})
+    # TODO use extract_options...
+    _you = options[:you] || You
+    _enemy = options[:enemy] || [Dragon, SuperDragon].sample
+    _ui = options[:ui] || Ui.new
+    _questions = options[:questions] || Questions
+
+    Log.start { "DS.new..." }
     @instructing = false
     @sleeping = false
     @slaying = true # global boolean
@@ -52,19 +61,25 @@ class DragonSlayer
     @response = nil
     prepare_to_attack
     next_state
+    Log.stop { "DS.new" }
   end
 
-  def run
-    @ui.run
-  end
+  #def run
+  #  Log.start { "DS#run" }
+  #  @ui.run(self)
+  #  Log.stop { "DS#run" }
+  #end
 
   def peek_state
+    Log.one { "peek" }
     @state_queue.last
   end
 
   def next_state
-    puts "popping state: #{peek_state.inspect}"
+    Log.start { "next state" }
+    Log.puts { "popping state: #{peek_state.inspect}" }
     @state = @state_queue.pop
+    Log.stop { "next state" }
   end
 
   def name
@@ -72,39 +87,49 @@ class DragonSlayer
   end
 
   def sleep_till(sleep_end)
+    Log.start { "sleep till: #{sleep_end.inspect}..." }
     @sleep_end = sleep_end
-    @state = :sleep_state
+    queue(:sleep_state)
+    next_state
+    Log.stop { "sleep till" }
   end
 
   def cheat
+    Log.start { "cheat..." }
     _question_with_answer = question.full_response_with( question.displayable_answers.sample )
     ui.interstitial( CHEAT_MSG % _question_with_answer, :final_sleep => 4.7 )
     queue(:try_again)
     # try_again
+    Log.stop { "cheat (ui in bkgrnd)... (awaiting next_state for :try_again)" }
   end
 
   def help
+    Log.start { "help..." }
     queue(:instructions)
-    #instructions
     queue(:try_again)
-    #try_again
+    Log.stop { "help ...but state hasn't been changed, yet" }
   end
 
   def quit
+    Log.start { "quit..." }
     queue(:_exit)
     ui.interstitial QUIT_MSG, :sound_name => :quit, :final_sleep => 2.0
+    Log.stop { "quit (ui in bkgrnd)... (awaiting next_state for :_exit)" }
   end
 
   def _exit
+    Log.start { "_exit..." }
     ui.exit
   end
 
   def try_again
+    Log.start { "try again..." }
     @tries += 1
     @response = nil
     @raw_response = nil
     queue(:get_raw_response)
     ui.interstitial TRY_MSG % @tries, :clear_screen => false
+    Log.stop { "try again (ui in bkgrnd)..." }
   end
 
   def instructing?
@@ -112,47 +137,64 @@ class DragonSlayer
   end
 
   def instruction_state
-    return if instructing?
+    Log.start { "instruction_state" }
+    if instructing?
+      Log.puts { "no ...already!" }
+      return
+    end
     @instructing = true
     queue(:stop_instructing)
     instructions :sound_name => :start, :final_sleep => 9
+    Log.stop { "instruction_state (ui in bkgrnd)..." }
   end
 
   def stop_instructing
+    Log.start { "stop_instructing" }
     @instructing = false
     next_state
+    Log.stop { "stop_instructing" }
   end
 
   def sleep_state
+    Log.print_raw { "." }
     time_left = @sleep_end - Gosu::milliseconds
     # puts "time_left: #{time_left.inspect}"
     @sleeping = true
     return if time_left > 0
+    Log.puts_raw { "!" }
     @sleeping = false
     #puts "peek_state: #{peek_state.inspect}"
     next_state
+    Log.stop { "sleep_state" }
   end
 
   def clear_display
+    Log.start { "DS#clear_display" }
     ui.clear_display
+    Log.stop { "DS#clear_display" }
   end
 
   def queue(method_name)
+    Log.start { "queue #{method_name}..." }
     state_queue.push(method_name)
+    Log.stop { "queue" }
   end
 
   def update
+    Log.start { "DS#update..." }
     if state
-      # puts "sending state: #{state}"
+      Log.puts { "sending state: #{state}" }
+      Log.stop { "DS#updated..." }
       return send(state)
     else
-      #puts "updating..."
+      Log.puts { "updating..." }
       unless slaying?
-        puts "exiting"
+        Log.puts { "exiting" }
+        Log.stop { "DS#updated..." }
         ui.exit
       end
       unless attacking?
-        puts "preparing to attack..."
+        Log.puts { "preparing to attack..." }
         queue(:attack)
         @attacking = true
         prepare_to_attack
@@ -161,10 +203,12 @@ class DragonSlayer
         queue(:get_raw_response)
         next_state
       end
+      Log.stop { "DS#updated..." }
     end
   end
 
   def attack
+    Log.start { "DS#attack..." }
     if 0 == damage_this_round
       queue(:missed)
       @attacking = false
@@ -182,6 +226,7 @@ class DragonSlayer
         ui.interstitial "The #{enemy} inflicted #{damage_this_round} damage-point(s) to you\nfor a total of #{@you.total_damage}", :clear_screen => false, :sound_name => :roar
       end
     end
+    Log.stop { "DS#attack." }
   end
 
   private
@@ -245,8 +290,9 @@ class DragonSlayer
   end
 
   def process_raw_response
+    Log.start { "process_raw_response" }
     unless @raw_response
-      puts "no raw response, yet"
+      Log.puts { "no raw response, yet" }
       return
     end
     @tokenized_response = Question.tokenize( @raw_response, SPECIAL_ANSWERS )
@@ -256,6 +302,7 @@ class DragonSlayer
       return send(@tokenized_response)
     end
     process_tokenized_response
+    Log.stop { "process_raw_response" }
   end
 
   def process_tokenized_response
@@ -297,13 +344,16 @@ class DragonSlayer
   end
 
   def damage_this_round
+    Log.start { "damage_this_round" }
     unless @damage_this_round
       @damage_this_round = aggressor.possible_damage.sample
     end
+    Log.stop { "damage_this_round" }
     @damage_this_round
   end
 
   def prepare_to_attack
+    Log.start { "prepare_to_attack" }
     @bool = nil
     @tries = 1
     @question = nil
@@ -312,5 +362,6 @@ class DragonSlayer
     @aggressor = nil
     #@other = nil
     @damage_this_round = nil
+    Log.stop { "prepare_to_attack" }
   end
 end

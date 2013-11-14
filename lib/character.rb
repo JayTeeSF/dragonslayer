@@ -16,8 +16,17 @@ class Character
     hit_power.to_a + @miss_array
   end
 
+  # regain 10% strength (if you can rest)
+  def rest
+    @total_damage = @total_damage - 0.1 * strength
+  end
+
+  def health
+    strength - total_damage
+  end
+
   def dead?
-    total_damage > strength
+    health > 0
   end
 
   def hit(damage)
