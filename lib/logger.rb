@@ -1,4 +1,5 @@
 class Logger
+  DEBUG = false
   attr_reader :log, :indent_level
   def initialize log=STDOUT, indent_level=0
     @log = log
@@ -6,12 +7,14 @@ class Logger
   end
 
   def start
+    return unless DEBUG
     message = yield
     puts_raw { indented("=> #{message}") }
     incr
   end
 
   def stop &block
+    return unless DEBUG
     decr
     message = yield
     puts_raw { indented("<= #{message}") }
@@ -32,16 +35,19 @@ class Logger
   end
 
   def puts
+    return unless DEBUG
     message = yield
     log.puts indented("- #{message}")
   end
 
   def puts_raw
+    return unless DEBUG
     message = yield
     log.puts message
   end
 
   def print_raw
+    return unless DEBUG
     message = yield
     log.print message
   end
